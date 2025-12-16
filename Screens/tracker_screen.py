@@ -26,12 +26,12 @@ class TrackerScreen(Screen):
         root = BoxLayout(orientation='vertical', padding=0, spacing=0)
         self.add_widget(root)
 
-        # Top bar with profile
+        # Top bar with logo and title
         top_bar = BoxLayout(
             orientation='horizontal',
             size_hint=(1, 0.12),
             padding=[20, 10, 20, 10],
-            spacing=15
+            spacing=10
         )
         
         with top_bar.canvas.before:
@@ -39,33 +39,41 @@ class TrackerScreen(Screen):
             self.top_rect = Rectangle()
         top_bar.bind(pos=self.update_top_rect, size=self.update_top_rect)
         
-        self.profile_img = Image(
-            source='assets/profile.png',
+        # Logo on the left
+        logo_img = Image(
+            source='assets/placeholder.png',
             size_hint=(None, 1),
             width=50,
             allow_stretch=True
         )
-        top_bar.add_widget(self.profile_img)
+        top_bar.add_widget(logo_img)
         
-        self.username_label = Label(
-            text="Guest",
-            font_size=20,
-            color=(0.9, 0.9, 0.9, 1),
-            halign='left',
-            valign='middle'
-        )
-        self.username_label.bind(size=self.username_label.setter('text_size'))
-        top_bar.add_widget(self.username_label)
-        
+        # Title next to logo
         title = Label(
             text="Nyx",
             font_size=28,
             color=(0.8, 0.8, 1, 1),
             size_hint=(None, 1),
-            width=80,
-            halign='right'
+            width=60,
+            halign='left'
         )
         top_bar.add_widget(title)
+        
+        # Spacer to push username to the right
+        top_bar.add_widget(Label(size_hint_x=1))
+        
+        # Username on the right
+        self.username_label = Label(
+            text="Guest",
+            font_size=20,
+            color=(0.9, 0.9, 0.9, 1),
+            halign='right',
+            valign='middle',
+            size_hint=(None, 1),
+            width=150
+        )
+        self.username_label.bind(size=self.username_label.setter('text_size'))
+        top_bar.add_widget(self.username_label)
         
         root.add_widget(top_bar)
 
@@ -276,11 +284,6 @@ class TrackerScreen(Screen):
     def set_user(self, user):
         self.user = user
         self.username_label.text = user['username']
-        if user.get('profile_pic'):
-            try:
-                self.profile_img.source = user['profile_pic']
-            except:
-                self.profile_img.source = 'assets/profile.png'
 
     def toggle_sleep(self, instance):
         if not self.is_sleeping:
