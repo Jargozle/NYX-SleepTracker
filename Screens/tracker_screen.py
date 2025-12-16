@@ -1,8 +1,11 @@
 """
 Sleep Tracker Screen for Nyx Sleep Tracker with Bedtime & Alarm
-Now with optional notifications using desktop-notifier and alarm overlay
+Windows-compatible version using win10toast for notifications
 """
+print("🔥 NEW TRACKER SCREEN LOADED 🔥")
 
+from kivy.resources import resource_find
+from kivy.resources import resource_add_path
 from kivy.uix.screenmanager import Screen
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
@@ -15,13 +18,26 @@ from kivy.uix.floatlayout import FloatLayout
 from kivy.graphics import Color, RoundedRectangle, Rectangle
 from kivy.clock import Clock
 from kivy.core.audio import SoundLoader
-from datetime import datetime, time, timedelta
+from datetime import datetime, time
 from components import DarkCard
 import NyxDB as db
-from desktop_notifier import DesktopNotifier
-import asyncio
-from threading import Thread
 import os
+import sys
+
+resource_add_path(os.path.join(os.path.dirname(__file__), '..'))
+resource_add_path(os.path.join(os.path.dirname(__file__), '..', 'assets'))
+
+# Try to import notification library
+NOTIFICATIONS_AVAILABLE = False
+try:
+    if sys.platform == 'win32':
+        from win10toast import ToastNotifier
+        toaster = ToastNotifier()
+        NOTIFICATIONS_AVAILABLE = True
+        print("Windows notifications enabled (win10toast)")
+except ImportError:
+    print(" win10toast not installed.")
+    print(" Notifications will be disabled, but alarms will still work.")
 
 
 class AlarmOverlay(FloatLayout):
@@ -54,13 +70,6 @@ class AlarmOverlay(FloatLayout):
             pos=lambda inst, val: setattr(center_box.rect, 'pos', center_box.pos),
             size=lambda inst, val: setattr(center_box.rect, 'size', center_box.size)
         )
-        
-        # Alarm icon/emoji
-        center_box.add_widget(Label(
-            text="⏰",
-            font_size=80,
-            size_hint_y=0.4
-        ))
         
         # Alarm title
         center_box.add_widget(Label(
@@ -118,11 +127,13 @@ class AlarmOverlay(FloatLayout):
                 if self.alarm_sound:
                     self.alarm_sound.loop = True
                     self.alarm_sound.play()
+                    print(f"🔊 Playing alarm sound: {sound_path}")
                     break
         
         # If no sound file found, print warning
         if not self.alarm_sound:
-            print("⚠️  Warning: No alarm sound found. Place an alarm sound file (alarm.wav, alarm.mp3, or alarm.ogg) in the assets/ folder.")
+            print("  No alarm sound found. Place an alarm sound file in assets/")
+            print("  Supported formats: alarm.wav, alarm.mp3, alarm.ogg")
     
     def stop_alarm(self, instance):
         """Stop the alarm sound and close overlay"""
@@ -138,23 +149,25 @@ class TrackerScreen(Screen):
         self.user = None
         self.sleep_start_time = None
         self.is_sleeping = False
-        self.notifier = DesktopNotifier(app_name="Nyx Sleep Tracker")
-        self.notification_thread = None
         self.bedtime_enabled = False
         self.alarm_enabled = False
         self.alarm_overlay = None
         self.last_alarm_trigger = None  # Prevent repeated triggers
+        self.check_event = None  # Store the Clock event
 
         root = BoxLayout(orientation='vertical', padding=0, spacing=0)
         self.root_layout = root
         self.add_widget(root)
 
         # Top bar with logo, title, username, and logout
+        TOP_BAR_HEIGHT = 80  # easy to tweak later
+
         top_bar = BoxLayout(
             orientation='horizontal',
-            size_hint=(1, 0.12),
-            padding=[20, 10, 20, 10],
-            spacing=10
+            size_hint=(1, None),
+            height=TOP_BAR_HEIGHT,
+            padding=[20, 15],
+            spacing=15
         )
         
         with top_bar.canvas.before:
@@ -164,9 +177,10 @@ class TrackerScreen(Screen):
         
         # Logo on the left
         logo_img = Image(
-            source='assets/placeholder.png',
+            source='assets/iconlogo.png',
             size_hint=(None, 1),
-            width=50,
+            width=80,
+            keep_ratio=True,
             allow_stretch=True
         )
         top_bar.add_widget(logo_img)
@@ -198,17 +212,19 @@ class TrackerScreen(Screen):
         self.username_label.bind(size=self.username_label.setter('text_size'))
         top_bar.add_widget(self.username_label)
         
-        # Logout button
         logout_btn = Button(
-            text="🚪",
-            font_size=24,
+            text="Logout",
             size_hint=(None, 1),
-            width=50,
-            background_color=(0.8, 0.3, 0.3, 1)
+            width=80,
+            font_size=18,
+            color=(1, 1, 1, 1),
+            background_color=(0.8, 0.3, 0.3, 1),
+            background_normal='',
+            background_down=''
         )
         logout_btn.bind(on_press=self.logout)
         top_bar.add_widget(logout_btn)
-        
+
         root.add_widget(top_bar)
 
         # Main content
@@ -247,7 +263,7 @@ class TrackerScreen(Screen):
         bedtime_header.add_widget(self.bedtime_checkbox)
         
         bedtime_header.add_widget(Label(
-            text="Bedtime",
+            text="Bedtimes",
             font_size=16,
             color=(0.8, 0.8, 0.9, 1),
             halign='left',
@@ -402,7 +418,7 @@ class TrackerScreen(Screen):
     def _create_nav_bar(self):
         nav_bar = BoxLayout(
             orientation='horizontal',
-            size_hint=(1, 0.1),
+            size_hint=(1, 0.16),
             spacing=20,
             padding=[20, 10]
         )
@@ -431,8 +447,8 @@ class TrackerScreen(Screen):
         return nav_bar
 
     def update_top_rect(self, *args):
-        self.top_rect.pos = self.top_rect.pos[0], self.top_rect.pos[1]
-        self.top_rect.size = self.size[0], self.size[1] * 0.12
+        self.top_rect.pos = self.pos[0], self.pos[1] + self.height - 90
+        self.top_rect.size = self.width, 90
 
     def update_nav_rect(self, *args):
         nav_bar = self.children[0].children[0]
@@ -450,6 +466,8 @@ class TrackerScreen(Screen):
         
         if value:
             self.start_notification_checker()
+        else:
+            self.stop_notification_checker()
         
     def on_alarm_toggle(self, checkbox, value):
         self.alarm_enabled = value
@@ -462,80 +480,99 @@ class TrackerScreen(Screen):
         
         if value:
             self.start_notification_checker()
+        else:
+            self.stop_notification_checker()
 
     def start_notification_checker(self):
-        """Start the notification checking thread"""
-        if self.notification_thread is None or not self.notification_thread.is_alive():
-            self.notification_thread = Thread(target=self.notification_loop, daemon=True)
-            self.notification_thread.start()
+        """Start checking for bedtime and alarm notifications using Kivy's Clock"""
+        if self.check_event is None:
+            # Check every 30 seconds
+            self.check_event = Clock.schedule_interval(self.check_notifications, 30)
+            print("✅ Notification checker started")
 
-    def notification_loop(self):
-        """Background thread to check for bedtime and alarm notifications"""
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+    def stop_notification_checker(self):
+        """Stop the notification checker if both alarms are disabled"""
+        if not self.bedtime_enabled and not self.alarm_enabled:
+            if self.check_event:
+                Clock.unschedule(self.check_event)
+                self.check_event = None
+                print("⏹️ Notification checker stopped")
+
+    def check_notifications(self, dt):
+        """Check if it's time for bedtime or alarm notifications"""
+        now = datetime.now()
+        current_time = now.time()
+        current_minute = f"{now.hour}:{now.minute}"
         
-        while True:
+        # Check bedtime
+        if self.bedtime_enabled:
+            bedtime = self.get_time_from_inputs(
+                self.bedtime_hour.text,
+                self.bedtime_minute.text,
+                self.bedtime_ampm.text
+            )
+            if bedtime and self.is_within_minute(current_time, bedtime):
+                if self.last_alarm_trigger != f"bedtime_{current_minute}":
+                    self.last_alarm_trigger = f"bedtime_{current_minute}"
+                    self.send_bedtime_notification()
+        
+        # Check alarm
+        if self.alarm_enabled and not self.alarm_overlay:
+            alarm_time = self.get_time_from_inputs(
+                self.alarm_hour.text,
+                self.alarm_minute.text,
+                self.alarm_ampm.text
+            )
+            if alarm_time and self.is_within_minute(current_time, alarm_time):
+                if self.last_alarm_trigger != f"alarm_{current_minute}":
+                    self.last_alarm_trigger = f"alarm_{current_minute}"
+                    self.show_alarm_overlay()
+
+    def send_bedtime_notification(self):
+        """Send bedtime notification using Windows toast notifications"""
+        if NOTIFICATIONS_AVAILABLE:
             try:
-                now = datetime.now()
-                current_time = now.time()
-                current_minute = f"{now.hour}:{now.minute}"
-                
-                # Check bedtime
-                if self.bedtime_enabled:
-                    bedtime = self.get_time_from_inputs(
-                        self.bedtime_hour.text,
-                        self.bedtime_minute.text,
-                        self.bedtime_ampm.text
+                # Run in a separate thread to avoid blocking
+                from threading import Thread
+                def show_toast():
+                    toaster.show_toast(
+                        "🌙 Bedtime Reminder",
+                        "It's time to go to bed for a good night's sleep!",
+                        duration=10,
+                        threaded=True
                     )
-                    if bedtime and self.is_within_minute(current_time, bedtime):
-                        if self.last_alarm_trigger != f"bedtime_{current_minute}":
-                            self.last_alarm_trigger = f"bedtime_{current_minute}"
-                            loop.run_until_complete(
-                                self.notifier.send(
-                                    title="🌙 Bedtime Reminder",
-                                    message="It's time to go to bed for a good night's sleep!"
-                                )
-                            )
-                
-                # Check alarm - trigger overlay on main thread
-                if self.alarm_enabled and not self.alarm_overlay:
-                    alarm_time = self.get_time_from_inputs(
-                        self.alarm_hour.text,
-                        self.alarm_minute.text,
-                        self.alarm_ampm.text
-                    )
-                    if alarm_time and self.is_within_minute(current_time, alarm_time):
-                        if self.last_alarm_trigger != f"alarm_{current_minute}":
-                            self.last_alarm_trigger = f"alarm_{current_minute}"
-                            # Schedule alarm overlay on main thread
-                            Clock.schedule_once(lambda dt: self.show_alarm_overlay(), 0)
-                
-                # Sleep for 30 seconds before checking again
-                import time
-                time.sleep(30)
-                
+                Thread(target=show_toast, daemon=True).start()
+                print("✅ Bedtime notification sent")
             except Exception as e:
-                print(f"Notification error: {e}")
-                import time
-                time.sleep(30)
+                print(f"⚠️ Notification error: {e}")
+        else:
+            print("🌙 Bedtime reminder (notifications not available)")
 
     def show_alarm_overlay(self):
         """Show the alarm overlay with sound"""
         if not self.alarm_overlay:
             self.alarm_overlay = AlarmOverlay(callback=self.close_alarm_overlay)
             self.add_widget(self.alarm_overlay)
+            print("⏰ Alarm triggered!")
 
     def close_alarm_overlay(self):
         """Close the alarm overlay"""
         if self.alarm_overlay:
             self.remove_widget(self.alarm_overlay)
             self.alarm_overlay = None
+            print("⏰ Alarm stopped")
 
     def get_time_from_inputs(self, hour_str, minute_str, ampm):
         """Convert time inputs to a time object"""
         try:
             hour = int(hour_str)
             minute = int(minute_str)
+            
+            # Validate inputs
+            if not (1 <= hour <= 12):
+                return None
+            if not (0 <= minute <= 59):
+                return None
             
             # Convert to 24-hour format
             if ampm == 'PM' and hour != 12:
@@ -601,6 +638,9 @@ class TrackerScreen(Screen):
         """Handle user logout"""
         # Save settings before logout
         self.save_user_settings()
+        
+        # Stop notification checker
+        self.stop_notification_checker()
         
         self.user = None
         self.username_label.text = "Guest"
