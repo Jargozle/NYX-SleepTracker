@@ -10,12 +10,12 @@ def get_connection():
 
 
 # ---------- USERS ----------
-def create_user(username, password, profile_pic="assets/profile.png"):
+def create_user(username, password):
     db = get_connection()
     cur = db.cursor()
     cur.execute(
-        "INSERT INTO users (username, password, profile_pic) VALUES (%s,%s,%s)",
-        (username, password, profile_pic)
+        "INSERT INTO users (username, password) VALUES (%s,%s)",
+        (username, password)
     )
     db.commit()
     db.close()
