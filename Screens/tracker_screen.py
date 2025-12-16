@@ -1,5 +1,6 @@
 """
 Sleep Tracker Screen for Nyx Sleep Tracker with Bedtime & Alarm
+Now with optional notifications using desktop-notifier and alarm overlay
 """
 
 from kivy.uix.screenmanager import Screen
@@ -9,11 +10,126 @@ from kivy.uix.label import Label
 from kivy.uix.image import Image
 from kivy.uix.textinput import TextInput
 from kivy.uix.spinner import Spinner
+from kivy.uix.checkbox import CheckBox
+from kivy.uix.floatlayout import FloatLayout
 from kivy.graphics import Color, RoundedRectangle, Rectangle
 from kivy.clock import Clock
-from datetime import datetime
+from kivy.core.audio import SoundLoader
+from datetime import datetime, time, timedelta
 from components import DarkCard
 import NyxDB as db
+from desktop_notifier import DesktopNotifier
+import asyncio
+from threading import Thread
+import os
+
+
+class AlarmOverlay(FloatLayout):
+    """Full-screen alarm overlay with sound and stop button"""
+    
+    def __init__(self, callback, **kwargs):
+        super().__init__(**kwargs)
+        self.callback = callback
+        
+        # Semi-transparent dark background
+        with self.canvas.before:
+            Color(0, 0, 0, 0.85)
+            self.bg_rect = Rectangle(pos=self.pos, size=self.size)
+        self.bind(pos=self.update_bg, size=self.update_bg)
+        
+        # Center container
+        center_box = BoxLayout(
+            orientation='vertical',
+            spacing=30,
+            padding=40,
+            size_hint=(0.8, None),
+            height=350,
+            pos_hint={'center_x': 0.5, 'center_y': 0.5}
+        )
+        
+        with center_box.canvas.before:
+            Color(0.15, 0.12, 0.25, 1)
+            center_box.rect = RoundedRectangle(radius=[30])
+        center_box.bind(
+            pos=lambda inst, val: setattr(center_box.rect, 'pos', center_box.pos),
+            size=lambda inst, val: setattr(center_box.rect, 'size', center_box.size)
+        )
+        
+        # Alarm icon/emoji
+        center_box.add_widget(Label(
+            text="⏰",
+            font_size=80,
+            size_hint_y=0.4
+        ))
+        
+        # Alarm title
+        center_box.add_widget(Label(
+            text="WAKE UP!",
+            font_size=48,
+            color=(1, 0.9, 0.3, 1),
+            bold=True,
+            size_hint_y=0.3
+        ))
+        
+        # Current time
+        self.time_label = Label(
+            text=datetime.now().strftime("%I:%M %p"),
+            font_size=32,
+            color=(0.9, 0.9, 1, 1),
+            size_hint_y=0.2
+        )
+        center_box.add_widget(self.time_label)
+        Clock.schedule_interval(self.update_time, 1)
+        
+        # Stop button
+        stop_btn = Button(
+            text="Stop Alarm",
+            font_size=28,
+            size_hint_y=0.3,
+            background_color=(0.8, 0.3, 0.3, 1)
+        )
+        stop_btn.bind(on_press=self.stop_alarm)
+        center_box.add_widget(stop_btn)
+        
+        self.add_widget(center_box)
+        
+        # Load and play alarm sound
+        self.alarm_sound = None
+        self.load_alarm_sound()
+        
+    def update_bg(self, *args):
+        self.bg_rect.pos = self.pos
+        self.bg_rect.size = self.size
+    
+    def update_time(self, dt):
+        self.time_label.text = datetime.now().strftime("%I:%M %p")
+    
+    def load_alarm_sound(self):
+        """Load alarm sound - tries multiple common alarm sound paths"""
+        sound_paths = [
+            'assets/alarm.wav',
+            'assets/alarm.mp3',
+            'assets/alarm.ogg'
+        ]
+        
+        for sound_path in sound_paths:
+            if os.path.exists(sound_path):
+                self.alarm_sound = SoundLoader.load(sound_path)
+                if self.alarm_sound:
+                    self.alarm_sound.loop = True
+                    self.alarm_sound.play()
+                    break
+        
+        # If no sound file found, print warning
+        if not self.alarm_sound:
+            print("⚠️  Warning: No alarm sound found. Place an alarm sound file (alarm.wav, alarm.mp3, or alarm.ogg) in the assets/ folder.")
+    
+    def stop_alarm(self, instance):
+        """Stop the alarm sound and close overlay"""
+        if self.alarm_sound:
+            self.alarm_sound.stop()
+        Clock.unschedule(self.update_time)
+        self.callback()
 
 
 class TrackerScreen(Screen):
@@ -22,11 +138,18 @@ class TrackerScreen(Screen):
         self.user = None
         self.sleep_start_time = None
         self.is_sleeping = False
+        self.notifier = DesktopNotifier(app_name="Nyx Sleep Tracker")
+        self.notification_thread = None
+        self.bedtime_enabled = False
+        self.alarm_enabled = False
+        self.alarm_overlay = None
+        self.last_alarm_trigger = None  # Prevent repeated triggers
 
         root = BoxLayout(orientation='vertical', padding=0, spacing=0)
+        self.root_layout = root
         self.add_widget(root)
 
-        # Top bar with logo and title
+        # Top bar with logo, title, username, and logout
         top_bar = BoxLayout(
             orientation='horizontal',
             size_hint=(1, 0.12),
@@ -75,6 +198,17 @@ class TrackerScreen(Screen):
         self.username_label.bind(size=self.username_label.setter('text_size'))
         top_bar.add_widget(self.username_label)
         
+        # Logout button
+        logout_btn = Button(
+            text="🚪",
+            font_size=24,
+            size_hint=(None, 1),
+            width=50,
+            background_color=(0.8, 0.3, 0.3, 1)
+        )
+        logout_btn.bind(on_press=self.logout)
+        top_bar.add_widget(logout_btn)
+        
         root.add_widget(top_bar)
 
         # Main content
@@ -94,19 +228,32 @@ class TrackerScreen(Screen):
         Clock.schedule_interval(self.update_time, 1)
 
         # Bedtime and Alarm Settings Card
-        time_card = DarkCard(size_hint=(1, None), height=140)
+        time_card = DarkCard(size_hint=(1, None), height=160)
         
         time_grid = BoxLayout(orientation='horizontal', spacing=15)
         
         # Bedtime section
         bedtime_box = BoxLayout(orientation='vertical', spacing=8)
-        bedtime_box.add_widget(Label(
+        
+        # Bedtime header with checkbox
+        bedtime_header = BoxLayout(orientation='horizontal', size_hint_y=None, height=25, spacing=5)
+        self.bedtime_checkbox = CheckBox(
+            size_hint=(None, 1),
+            width=25,
+            active=False,
+            color=(0.4, 0.3, 0.8, 1)
+        )
+        self.bedtime_checkbox.bind(active=self.on_bedtime_toggle)
+        bedtime_header.add_widget(self.bedtime_checkbox)
+        
+        bedtime_header.add_widget(Label(
             text="Bedtime",
             font_size=16,
             color=(0.8, 0.8, 0.9, 1),
-            size_hint_y=None,
-            height=25
+            halign='left',
+            valign='middle'
         ))
+        bedtime_box.add_widget(bedtime_header)
         
         bedtime_inputs = BoxLayout(orientation='horizontal', spacing=5, size_hint_y=None, height=45)
         
@@ -118,7 +265,8 @@ class TrackerScreen(Screen):
             halign='center',
             background_color=(0.15, 0.15, 0.22, 1),
             foreground_color=(1, 1, 1, 1),
-            padding=[10, 12]
+            padding=[10, 12],
+            disabled=True
         )
         bedtime_inputs.add_widget(self.bedtime_hour)
         
@@ -132,7 +280,8 @@ class TrackerScreen(Screen):
             halign='center',
             background_color=(0.15, 0.15, 0.22, 1),
             foreground_color=(1, 1, 1, 1),
-            padding=[10, 12]
+            padding=[10, 12],
+            disabled=True
         )
         bedtime_inputs.add_widget(self.bedtime_minute)
         
@@ -142,7 +291,8 @@ class TrackerScreen(Screen):
             size_hint_x=0.6,
             background_color=(0.4, 0.3, 0.8, 1),
             color=(1, 1, 1, 1),
-            font_size=18
+            font_size=18,
+            disabled=True
         )
         bedtime_inputs.add_widget(self.bedtime_ampm)
         
@@ -151,13 +301,26 @@ class TrackerScreen(Screen):
         
         # Alarm section
         alarm_box = BoxLayout(orientation='vertical', spacing=8)
-        alarm_box.add_widget(Label(
+        
+        # Alarm header with checkbox
+        alarm_header = BoxLayout(orientation='horizontal', size_hint_y=None, height=25, spacing=5)
+        self.alarm_checkbox = CheckBox(
+            size_hint=(None, 1),
+            width=25,
+            active=False,
+            color=(0.4, 0.3, 0.8, 1)
+        )
+        self.alarm_checkbox.bind(active=self.on_alarm_toggle)
+        alarm_header.add_widget(self.alarm_checkbox)
+        
+        alarm_header.add_widget(Label(
             text="Alarm",
             font_size=16,
             color=(0.8, 0.8, 0.9, 1),
-            size_hint_y=None,
-            height=25
+            halign='left',
+            valign='middle'
         ))
+        alarm_box.add_widget(alarm_header)
         
         alarm_inputs = BoxLayout(orientation='horizontal', spacing=5, size_hint_y=None, height=45)
         
@@ -169,7 +332,8 @@ class TrackerScreen(Screen):
             halign='center',
             background_color=(0.15, 0.15, 0.22, 1),
             foreground_color=(1, 1, 1, 1),
-            padding=[10, 12]
+            padding=[10, 12],
+            disabled=True
         )
         alarm_inputs.add_widget(self.alarm_hour)
         
@@ -183,7 +347,8 @@ class TrackerScreen(Screen):
             halign='center',
             background_color=(0.15, 0.15, 0.22, 1),
             foreground_color=(1, 1, 1, 1),
-            padding=[10, 12]
+            padding=[10, 12],
+            disabled=True
         )
         alarm_inputs.add_widget(self.alarm_minute)
         
@@ -193,7 +358,8 @@ class TrackerScreen(Screen):
             size_hint_x=0.6,
             background_color=(0.4, 0.3, 0.8, 1),
             color=(1, 1, 1, 1),
-            font_size=18
+            font_size=18,
+            disabled=True
         )
         alarm_inputs.add_widget(self.alarm_ampm)
         
@@ -204,7 +370,7 @@ class TrackerScreen(Screen):
         content.add_widget(time_card)
 
         # Sleep tracker card
-        card = DarkCard(size_hint=(1, 0.55))
+        card = DarkCard(size_hint=(1, 0.5))
         content.add_widget(card)
 
         self.sleep_label = Label(
@@ -273,6 +439,119 @@ class TrackerScreen(Screen):
         self.nav_rect.pos = nav_bar.pos
         self.nav_rect.size = nav_bar.size
 
+    def on_bedtime_toggle(self, checkbox, value):
+        self.bedtime_enabled = value
+        self.bedtime_hour.disabled = not value
+        self.bedtime_minute.disabled = not value
+        self.bedtime_ampm.disabled = not value
+        
+        # Save settings when changed
+        self.save_user_settings()
+        
+        if value:
+            self.start_notification_checker()
+        
+    def on_alarm_toggle(self, checkbox, value):
+        self.alarm_enabled = value
+        self.alarm_hour.disabled = not value
+        self.alarm_minute.disabled = not value
+        self.alarm_ampm.disabled = not value
+        
+        # Save settings when changed
+        self.save_user_settings()
+        
+        if value:
+            self.start_notification_checker()
+
+    def start_notification_checker(self):
+        """Start the notification checking thread"""
+        if self.notification_thread is None or not self.notification_thread.is_alive():
+            self.notification_thread = Thread(target=self.notification_loop, daemon=True)
+            self.notification_thread.start()
+
+    def notification_loop(self):
+        """Background thread to check for bedtime and alarm notifications"""
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+        while True:
+            try:
+                now = datetime.now()
+                current_time = now.time()
+                current_minute = f"{now.hour}:{now.minute}"
+                
+                # Check bedtime
+                if self.bedtime_enabled:
+                    bedtime = self.get_time_from_inputs(
+                        self.bedtime_hour.text,
+                        self.bedtime_minute.text,
+                        self.bedtime_ampm.text
+                    )
+                    if bedtime and self.is_within_minute(current_time, bedtime):
+                        if self.last_alarm_trigger != f"bedtime_{current_minute}":
+                            self.last_alarm_trigger = f"bedtime_{current_minute}"
+                            loop.run_until_complete(
+                                self.notifier.send(
+                                    title="🌙 Bedtime Reminder",
+                                    message="It's time to go to bed for a good night's sleep!"
+                                )
+                            )
+                
+                # Check alarm - trigger overlay on main thread
+                if self.alarm_enabled and not self.alarm_overlay:
+                    alarm_time = self.get_time_from_inputs(
+                        self.alarm_hour.text,
+                        self.alarm_minute.text,
+                        self.alarm_ampm.text
+                    )
+                    if alarm_time and self.is_within_minute(current_time, alarm_time):
+                        if self.last_alarm_trigger != f"alarm_{current_minute}":
+                            self.last_alarm_trigger = f"alarm_{current_minute}"
+                            # Schedule alarm overlay on main thread
+                            Clock.schedule_once(lambda dt: self.show_alarm_overlay(), 0)
+                
+                # Sleep for 30 seconds before checking again
+                import time
+                time.sleep(30)
+                
+            except Exception as e:
+                print(f"Notification error: {e}")
+                import time
+                time.sleep(30)
+
+    def show_alarm_overlay(self):
+        """Show the alarm overlay with sound"""
+        if not self.alarm_overlay:
+            self.alarm_overlay = AlarmOverlay(callback=self.close_alarm_overlay)
+            self.add_widget(self.alarm_overlay)
+
+    def close_alarm_overlay(self):
+        """Close the alarm overlay"""
+        if self.alarm_overlay:
+            self.remove_widget(self.alarm_overlay)
+            self.alarm_overlay = None
+
+    def get_time_from_inputs(self, hour_str, minute_str, ampm):
+        """Convert time inputs to a time object"""
+        try:
+            hour = int(hour_str)
+            minute = int(minute_str)
+            
+            # Convert to 24-hour format
+            if ampm == 'PM' and hour != 12:
+                hour += 12
+            elif ampm == 'AM' and hour == 12:
+                hour = 0
+            
+            return time(hour, minute)
+        except:
+            return None
+
+    def is_within_minute(self, current_time, target_time):
+        """Check if current time is within the target minute"""
+        return (current_time.hour == target_time.hour and 
+                current_time.minute == target_time.minute)
+
     def update_time(self, dt):
         self.time_label.text = datetime.now().strftime("%I:%M %p")
         
@@ -284,6 +563,9 @@ class TrackerScreen(Screen):
     def set_user(self, user):
         self.user = user
         self.username_label.text = user['username']
+        
+        # Load saved alarm settings
+        self.load_user_settings()
 
     def toggle_sleep(self, instance):
         if not self.is_sleeping:
@@ -314,3 +596,77 @@ class TrackerScreen(Screen):
             self.start_btn.text = "Start Sleep"
             self.start_btn.background_color = (0.4, 0.3, 0.8, 1)
             self.duration_label.text = ""
+
+    def logout(self, instance):
+        """Handle user logout"""
+        # Save settings before logout
+        self.save_user_settings()
+        
+        self.user = None
+        self.username_label.text = "Guest"
+        self.is_sleeping = False
+        self.sleep_start_time = None
+        self.start_btn.text = "Start Sleep"
+        self.start_btn.background_color = (0.4, 0.3, 0.8, 1)
+        self.duration_label.text = ""
+        self.sleep_label.text = "Ready to track your sleep"
+        
+        # Reset checkboxes (will be restored on next login)
+        self.bedtime_checkbox.active = False
+        self.alarm_checkbox.active = False
+        
+        # Close alarm overlay if active
+        if self.alarm_overlay:
+            self.close_alarm_overlay()
+        
+        # Go back to login screen
+        self.manager.current = 'login'
+    
+    def save_user_settings(self):
+        """Save bedtime and alarm settings to database"""
+        if not self.user:
+            return
+        
+        try:
+            db.save_user_settings(
+                self.user['user_id'],
+                bedtime_enabled=self.bedtime_enabled,
+                bedtime_hour=self.bedtime_hour.text,
+                bedtime_minute=self.bedtime_minute.text,
+                bedtime_ampm=self.bedtime_ampm.text,
+                alarm_enabled=self.alarm_enabled,
+                alarm_hour=self.alarm_hour.text,
+                alarm_minute=self.alarm_minute.text,
+                alarm_ampm=self.alarm_ampm.text
+            )
+        except Exception as e:
+            print(f"Error saving settings: {e}")
+    
+    def load_user_settings(self):
+        """Load bedtime and alarm settings from database"""
+        if not self.user:
+            return
+        
+        try:
+            settings = db.get_user_settings(self.user['user_id'])
+            
+            if settings:
+                # Restore bedtime settings
+                self.bedtime_enabled = settings.get('bedtime_enabled', False)
+                self.bedtime_checkbox.active = self.bedtime_enabled
+                self.bedtime_hour.text = settings.get('bedtime_hour', '10')
+                self.bedtime_minute.text = settings.get('bedtime_minute', '00')
+                self.bedtime_ampm.text = settings.get('bedtime_ampm', 'PM')
+                
+                # Restore alarm settings
+                self.alarm_enabled = settings.get('alarm_enabled', False)
+                self.alarm_checkbox.active = self.alarm_enabled
+                self.alarm_hour.text = settings.get('alarm_hour', '06')
+                self.alarm_minute.text = settings.get('alarm_minute', '30')
+                self.alarm_ampm.text = settings.get('alarm_ampm', 'AM')
+                
+                # Start notification checker if any are enabled
+                if self.bedtime_enabled or self.alarm_enabled:
+                    self.start_notification_checker()
+        except Exception as e:
+            print(f"Error loading settings: {e}")
