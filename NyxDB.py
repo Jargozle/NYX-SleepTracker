@@ -64,3 +64,48 @@ def get_all_sessions(user_id):
     sessions = cur.fetchall()
     db.close()
     return sessions
+
+
+# ---------- USER SETTINGS ----------
+def save_user_settings(user_id, bedtime_enabled, bedtime_hour, bedtime_minute, bedtime_ampm,
+                      alarm_enabled, alarm_hour, alarm_minute, alarm_ampm):
+    """Save or update user's bedtime and alarm settings"""
+    db = get_connection()
+    cur = db.cursor()
+    
+    # Check if settings exist
+    cur.execute("SELECT * FROM user_settings WHERE user_id=%s", (user_id,))
+    existing = cur.fetchone()
+    
+    if existing:
+        # Update existing settings
+        cur.execute("""
+            UPDATE user_settings 
+            SET bedtime_enabled=%s, bedtime_hour=%s, bedtime_minute=%s, bedtime_ampm=%s,
+                alarm_enabled=%s, alarm_hour=%s, alarm_minute=%s, alarm_ampm=%s,
+                updated_at=NOW()
+            WHERE user_id=%s
+        """, (bedtime_enabled, bedtime_hour, bedtime_minute, bedtime_ampm,
+              alarm_enabled, alarm_hour, alarm_minute, alarm_ampm, user_id))
+    else:
+        # Insert new settings
+        cur.execute("""
+            INSERT INTO user_settings 
+            (user_id, bedtime_enabled, bedtime_hour, bedtime_minute, bedtime_ampm,
+             alarm_enabled, alarm_hour, alarm_minute, alarm_ampm)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+        """, (user_id, bedtime_enabled, bedtime_hour, bedtime_minute, bedtime_ampm,
+              alarm_enabled, alarm_hour, alarm_minute, alarm_ampm))
+    
+    db.commit()
+    db.close()
+
+
+def get_user_settings(user_id):
+    """Retrieve user's bedtime and alarm settings"""
+    db = get_connection()
+    cur = db.cursor(dictionary=True)
+    cur.execute("SELECT * FROM user_settings WHERE user_id=%s", (user_id,))
+    settings = cur.fetchone()
+    db.close()
+    return settings
