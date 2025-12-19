@@ -1,4 +1,5 @@
 import mysql.connector
+from datetime import datetime, timedelta
 
 def get_connection():
     return mysql.connector.connect(
@@ -10,12 +11,13 @@ def get_connection():
 
 
 # ---------- USERS ----------
-def create_user(username, password):
+def create_user(username, password, email):
+    """Create user with email support"""
     db = get_connection()
     cur = db.cursor()
     cur.execute(
-        "INSERT INTO users (username, password) VALUES (%s,%s)",
-        (username, password)
+        "INSERT INTO users (username, password, email) VALUES (%s,%s,%s)",
+        (username, password, email)
     )
     db.commit()
     db.close()
@@ -40,6 +42,81 @@ def get_user_by_name(username):
     user = cur.fetchone()
     db.close()
     return user
+
+
+def get_user_by_email(email):
+    """Get user by email address"""
+    db = get_connection()
+    cur = db.cursor(dictionary=True)
+    cur.execute("SELECT * FROM users WHERE email=%s", (email,))
+    user = cur.fetchone()
+    db.close()
+    return user
+
+
+def update_user_password(user_id, new_password):
+    """Update user's password"""
+    db = get_connection()
+    cur = db.cursor()
+    cur.execute(
+        "UPDATE users SET password=%s WHERE user_id=%s",
+        (new_password, user_id)
+    )
+    db.commit()
+    db.close()
+
+
+# ---------- PASSWORD RESET ----------
+def save_reset_code(email, code):
+    """Save password reset verification code"""
+    db = get_connection()
+    cur = db.cursor()
+    
+    expires_at = datetime.now() + timedelta(minutes=15)
+    
+    cur.execute("""
+        INSERT INTO password_resets (email, code, expires_at)
+        VALUES (%s, %s, %s)
+    """, (email, code, expires_at))
+    
+    db.commit()
+    db.close()
+
+
+def verify_reset_code(email, code):
+    """Verify password reset code"""
+    db = get_connection()
+    cur = db.cursor(dictionary=True)
+    
+    cur.execute("""
+        SELECT * FROM password_resets 
+        WHERE email=%s AND code=%s AND used=0 AND expires_at > NOW()
+        ORDER BY created_at DESC LIMIT 1
+    """, (email, code))
+    
+    result = cur.fetchone()
+    
+    if result:
+        # Mark code as used
+        cur.execute(
+            "UPDATE password_resets SET used=1 WHERE id=%s",
+            (result['id'],)
+        )
+        db.commit()
+        db.close()
+        return True
+    
+    db.close()
+    return False
+
+
+def delete_reset_code(email):
+    """Delete all reset codes for an email"""
+    db = get_connection()
+    cur = db.cursor()
+    cur.execute("DELETE FROM password_resets WHERE email=%s", (email,))
+    db.commit()
+    db.close()
 
 
 # ---------- SLEEP ----------
