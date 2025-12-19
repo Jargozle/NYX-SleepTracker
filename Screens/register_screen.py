@@ -3,6 +3,7 @@ Registration Screen for Nyx Sleep Tracker
 With email and enhanced password requirements
 """
 
+import random
 from kivy.uix.screenmanager import Screen
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.textinput import TextInput
@@ -12,12 +13,15 @@ from kivy.uix.image import Image
 from kivy.clock import Clock
 import NyxDB as db
 import re
+from celestial_overlay import add_celestial_background
 
 
 class RegisterScreen(Screen):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         
+        add_celestial_background(self, star_count=15, cloud_count=2)
+
         layout = BoxLayout(
             orientation='vertical',
             padding=40,
