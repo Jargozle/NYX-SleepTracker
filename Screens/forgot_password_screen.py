@@ -8,6 +8,7 @@ from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.textinput import TextInput
 from kivy.uix.button import Button
 from kivy.uix.label import Label
+from kivy.uix.image import Image
 from kivy.clock import Clock
 import NyxDB as db
 import random
@@ -179,7 +180,7 @@ class ForgotPasswordScreen(Screen):
             size_hint_y=0.15
         ))
         
-        # New password with show/hide
+        # New password with show/hide using image
         pass_container = BoxLayout(orientation='horizontal', size_hint_y=None, height=50, spacing=5)
         self.new_pass = TextInput(
             hint_text="New Password",
@@ -194,17 +195,18 @@ class ForgotPasswordScreen(Screen):
         pass_container.add_widget(self.new_pass)
         
         self.show_pass_btn = Button(
-            text="👁",
             size_hint=(None, 1),
             width=50,
-            font_size=24,
-            background_color=(0.25, 0.25, 0.35, 1)
+            background_normal='assets/Eyeslash.jpg',
+            background_down='assets/Eyeslash.jpg',
+            background_color=(0.6, 0.6, 0.7, 1),  # Light gray/blue color
+            border=(0, 0, 0, 0)
         )
         self.show_pass_btn.bind(on_press=self.toggle_password_visibility)
         pass_container.add_widget(self.show_pass_btn)
         self.layout.add_widget(pass_container)
         
-        # Confirm password with show/hide
+        # Confirm password with show/hide using image
         pass2_container = BoxLayout(orientation='horizontal', size_hint_y=None, height=50, spacing=5)
         self.new_pass2 = TextInput(
             hint_text="Confirm Password",
@@ -219,11 +221,12 @@ class ForgotPasswordScreen(Screen):
         pass2_container.add_widget(self.new_pass2)
         
         self.show_pass2_btn = Button(
-            text="👁",
             size_hint=(None, 1),
             width=50,
-            font_size=24,
-            background_color=(0.25, 0.25, 0.35, 1)
+            background_normal='assets/Eyeslash.png',
+            background_down='assets/Eyeslash.png',
+            background_color=(0.6, 0.6, 0.7, 1),  # Light gray/blue color
+            border=(0, 0, 0, 0)
         )
         self.show_pass2_btn.bind(on_press=self.toggle_password2_visibility)
         pass2_container.add_widget(self.show_pass2_btn)
@@ -258,11 +261,21 @@ class ForgotPasswordScreen(Screen):
     
     def toggle_password_visibility(self, instance):
         self.new_pass.password = not self.new_pass.password
-        self.show_pass_btn.text = "👁" if self.new_pass.password else "👁‍🗨"
+        if self.new_pass.password:
+            self.show_pass_btn.background_normal = 'assets/Eyeslash.png'
+            self.show_pass_btn.background_down = 'assets/Eyeslash.png'
+        else:
+            self.show_pass_btn.background_normal = 'assets/Eye.png'
+            self.show_pass_btn.background_down = 'assets/Eye.png'
     
     def toggle_password2_visibility(self, instance):
         self.new_pass2.password = not self.new_pass2.password
-        self.show_pass2_btn.text = "👁" if self.new_pass2.password else "👁‍🗨"
+        if self.new_pass2.password:
+            self.show_pass2_btn.background_normal = 'assets/Eyeslash.png'
+            self.show_pass2_btn.background_down = 'assets/Eyeslash.png'
+        else:
+            self.show_pass2_btn.background_normal = 'assets/Eye.png'
+            self.show_pass2_btn.background_down = 'assets/Eye.png'
     
     def generate_code(self):
         """Generate a 6-digit verification code"""
