@@ -4,6 +4,7 @@ Windows-compatible version using win10toast for notifications
 """
 print("🔥 NEW TRACKER SCREEN LOADED 🔥")
 
+import random
 from kivy.resources import resource_find
 from kivy.resources import resource_add_path
 from kivy.uix.screenmanager import Screen
@@ -19,10 +20,12 @@ from kivy.graphics import Color, RoundedRectangle, Rectangle
 from kivy.clock import Clock
 from kivy.core.audio import SoundLoader
 from datetime import datetime, time
+from celestial_overlay import CelestialOverlay
 from components import DarkCard
 import NyxDB as db
 import os
 import sys
+from celestial_overlay import add_celestial_background
 
 resource_add_path(os.path.join(os.path.dirname(__file__), '..'))
 resource_add_path(os.path.join(os.path.dirname(__file__), '..', 'assets'))
@@ -38,7 +41,6 @@ try:
 except ImportError:
     print(" win10toast not installed.")
     print(" Notifications will be disabled, but alarms will still work.")
-
 
 class AlarmOverlay(FloatLayout):
     """Full-screen alarm overlay with sound and stop button"""
@@ -146,6 +148,7 @@ class AlarmOverlay(FloatLayout):
 class TrackerScreen(Screen):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+
         self.user = None
         self.sleep_start_time = None
         self.is_sleeping = False
@@ -157,15 +160,15 @@ class TrackerScreen(Screen):
 
         root = BoxLayout(orientation='vertical', padding=0, spacing=0)
         self.root_layout = root
+        
+        add_celestial_background(root, star_count=25, cloud_count=3)
+
         self.add_widget(root)
-
-        # Top bar with logo, title, username, and logout
-        TOP_BAR_HEIGHT = 80  # easy to tweak later
-
+        
+        # Top bar with responsive height
         top_bar = BoxLayout(
             orientation='horizontal',
-            size_hint=(1, None),
-            height=TOP_BAR_HEIGHT,
+            size_hint=(1, 0.12),  # 12% of screen height
             padding=[20, 15],
             spacing=15
         )
