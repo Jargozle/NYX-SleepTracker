@@ -26,6 +26,54 @@ class DarkCard(BoxLayout):
         self.rect.pos = self.pos
         self.rect.size = self.size
 
+# Add to components.py
+
+def add_celestial_background(widget, star_count=20, cloud_count=2):
+    """Add celestial background to any widget"""
+    from kivy.graphics import Color, Ellipse, Rectangle
+    import random
+    
+    with widget.canvas.before:
+        # Background
+        Color(0.07, 0.07, 0.15, 1)
+        widget.bg_rect = Rectangle(pos=widget.pos, size=widget.size)
+        
+        # Stars
+        for _ in range(star_count):
+            x = random.uniform(20, widget.width - 20)
+            y = random.uniform(widget.height * 0.4, widget.height - 50)
+            brightness = random.uniform(0.7, 1.0)
+            Color(brightness, brightness, brightness, random.uniform(0.6, 0.9))
+            size = random.uniform(2, 4)
+            Ellipse(pos=(x, y), size=(size, size))
+        
+        # Moon
+        moon_x = widget.width - 80
+        moon_y = widget.height - 80
+        Color(0.98, 0.98, 0.9, 0.9)
+        Ellipse(pos=(moon_x, moon_y), size=(40, 40))
+        
+        # Clouds
+        Color(0.9, 0.9, 0.95, 0.35)
+        for i in range(cloud_count):
+            cloud_x = random.uniform(20, widget.width - 150)
+            cloud_y = random.uniform(20, 150)
+            cloud_size = random.uniform(80, 120)
+            for j in range(3):
+                offset_x = random.uniform(-15, 15)
+                offset_y = random.uniform(-8, 8)
+                Ellipse(
+                    pos=(cloud_x + offset_x + (j * 30), cloud_y + offset_y),
+                    size=(cloud_size * random.uniform(0.4, 0.7), cloud_size * 0.4)
+                )
+    
+    # Update on resize
+    def update_bg(instance, value):
+        if hasattr(instance, 'bg_rect'):
+            instance.bg_rect.pos = instance.pos
+            instance.bg_rect.size = instance.size
+    
+    widget.bind(size=update_bg, pos=update_bg)
 
 def create_stat_card(title, value):
     """Create a statistics card with title and value"""
