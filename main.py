@@ -9,6 +9,7 @@ from kivy.core.window import Window
 
 from Screens.login_screen import LoginScreen
 from Screens.register_screen import RegisterScreen
+from Screens.forgot_password_screen import ForgotPasswordScreen
 from Screens.tracker_screen import TrackerScreen
 from Screens.stats_screen import StatsScreen
 from Screens.graph_screen import GraphScreen
@@ -22,6 +23,7 @@ class NyxApp(App):
         sm = ScreenManager()
         sm.add_widget(LoginScreen(name="login"))
         sm.add_widget(RegisterScreen(name="register"))
+        sm.add_widget(ForgotPasswordScreen(name="forgot_password"))
         sm.add_widget(TrackerScreen(name="tracker"))
         sm.add_widget(StatsScreen(name="stats"))
         sm.add_widget(GraphScreen(name="graphs"))
