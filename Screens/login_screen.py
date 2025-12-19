@@ -8,6 +8,7 @@ from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.textinput import TextInput
 from kivy.uix.button import Button
 from kivy.uix.label import Label
+from kivy.uix.image import Image
 import NyxDB as db
 
 
@@ -43,7 +44,7 @@ class LoginScreen(Screen):
         )
         layout.add_widget(self.username)
         
-        # Password with show/hide button
+        # Password with show/hide button using image
         pass_container = BoxLayout(orientation='horizontal', size_hint_y=None, height=50, spacing=5)
         self.password = TextInput(
             hint_text="Password",
@@ -57,22 +58,24 @@ class LoginScreen(Screen):
         )
         pass_container.add_widget(self.password)
         
+        # Eye icon button
         self.show_pass_btn = Button(
-            text="👁",
             size_hint=(None, 1),
             width=50,
-            font_size=24,
-            background_color=(0.25, 0.25, 0.35, 1)
+            background_color=(0.9, 0.9, 0.95, 1),
+            background_normal='assets/Eyeslash.jpg',
+            background_down='assets/Eyeslash.jpg',
+            border=(0, 0, 0, 0)
         )
         self.show_pass_btn.bind(on_press=self.toggle_password_visibility)
         pass_container.add_widget(self.show_pass_btn)
         layout.add_widget(pass_container)
         
-        # Forgot Password as clickable text (invisible button)
+        # Forgot Password - centered
         forgot_container = BoxLayout(
-            orientation='horizontal',
+            orientation='vertical',
             size_hint_y=None,
-            height=30
+            height=35
         )
         
         forgot_btn = Button(
@@ -80,21 +83,16 @@ class LoginScreen(Screen):
             font_size=16,
             size_hint=(None, None),
             size=(200, 30),
-            background_color=(0, 0, 0, 0),  # Completely transparent
+            pos_hint={'center_x': 0.5},
+            background_color=(0, 0, 0, 0),
             background_normal='',
             background_down='',
             border=(0, 0, 0, 0),
-            color=(0.5, 0.7, 1, 1),  # Light blue
-            halign='left',
-            valign='middle',
-            pos_hint={'x': 0, 'center_y': 0.5}
+            color=(0.5, 0.7, 1, 1)
         )
-        forgot_btn.bind(size=forgot_btn.setter('text_size'))
         forgot_btn.bind(on_press=self.go_forgot_password)
         
         forgot_container.add_widget(forgot_btn)
-        forgot_container.add_widget(Label(size_hint_x=1))  # Spacer to push text left
-        
         layout.add_widget(forgot_container)
         
         # Login button
@@ -108,7 +106,7 @@ class LoginScreen(Screen):
         login_btn.bind(on_press=self.check_login)
         layout.add_widget(login_btn)
         
-        # Separator with "Or"
+        # Separator with "Or" and images
         separator_box = BoxLayout(
             orientation='horizontal',
             size_hint_y=None,
@@ -117,11 +115,15 @@ class LoginScreen(Screen):
             padding=[0, 10]
         )
         
-        separator_box.add_widget(Label(
-            text="──────",
-            font_size=18,
-            color=(0.5, 0.5, 0.6, 1)
-        ))
+        # Left separator image
+        left_sep = Image(
+            source='assets/Separator.png',
+            size_hint=(1, None),
+            height=2,
+            allow_stretch=True,
+            keep_ratio=False
+        )
+        separator_box.add_widget(left_sep)
         
         separator_box.add_widget(Label(
             text="Or",
@@ -130,11 +132,15 @@ class LoginScreen(Screen):
             size_hint_x=0.3
         ))
         
-        separator_box.add_widget(Label(
-            text="──────",
-            font_size=18,
-            color=(0.5, 0.5, 0.6, 1)
-        ))
+        # Right separator image
+        right_sep = Image(
+            source='assets/Separator.png',
+            size_hint=(1, None),
+            height=2,
+            allow_stretch=True,
+            keep_ratio=False
+        )
+        separator_box.add_widget(right_sep)
         
         layout.add_widget(separator_box)
         
@@ -163,7 +169,12 @@ class LoginScreen(Screen):
     
     def toggle_password_visibility(self, instance):
         self.password.password = not self.password.password
-        self.show_pass_btn.text = "👁" if self.password.password else "👁‍🗨"
+        if self.password.password:
+            self.show_pass_btn.background_normal = 'assets/Eyeslash.jpg'
+            self.show_pass_btn.background_down = 'assets/Eyeslash.jpg'
+        else:
+            self.show_pass_btn.background_normal = 'assets/Eye.jpg'
+            self.show_pass_btn.background_down = 'assets/Eye.png'
     
     def check_login(self, instance):
         username = self.username.text.strip()
@@ -185,7 +196,6 @@ class LoginScreen(Screen):
             self.username.text = ""
             self.password.text = ""
             self.password.password = True
-            self.show_pass_btn.text = "👁"
             self.message.text = ""
         else:
             self.message.text = "Invalid username or password"
