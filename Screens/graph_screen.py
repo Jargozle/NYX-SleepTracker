@@ -3,6 +3,7 @@ Graph Screen for Nyx Sleep Tracker
 Uses Matplotlib with Kivy Garden for visualization
 """
 
+import random
 from kivy.uix.screenmanager import Screen
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
@@ -12,7 +13,9 @@ from kivy.graphics import Color, Rectangle
 from datetime import datetime
 from collections import defaultdict
 import matplotlib
-matplotlib.use('Agg')  # Use non-interactive backend
+
+from celestial_overlay import add_celestial_background
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from matplotlib.patches import Rectangle as MPLRectangle
@@ -25,6 +28,8 @@ class GraphScreen(Screen):
         super().__init__(**kwargs)
         self.user = None
 
+        add_celestial_background(self, star_count=15, cloud_count=2)
+        
         root = BoxLayout(orientation='vertical', padding=0, spacing=0)
         self.add_widget(root)
 
@@ -51,7 +56,7 @@ class GraphScreen(Screen):
         top_bar.add_widget(back_btn)
         
         top_bar.add_widget(Label(
-            text="Sleep Graphs",
+            text="Sleep Charts",
             font_size=28,
             color=(0.8, 0.8, 1, 1)
         ))
@@ -243,3 +248,35 @@ class GraphScreen(Screen):
     def on_pre_enter(self):
         if self.user:
             self.load_graphs()
+    # Add this function to your components.py
+    def create_celestial_overlay():
+        """Create a simple celestial overlay widget"""
+        from kivy.uix.widget import Widget
+        from kivy.graphics import Color, Ellipse
+        
+        overlay = Widget()
+        
+        with overlay.canvas:
+            # Add some stars
+            star_positions = [
+                (50, 700), (150, 650), (300, 720), (450, 680),
+                (100, 500), (250, 550), (400, 500), (350, 600),
+                (200, 750), (380, 650)
+            ]
+            
+            for x, y in star_positions:
+                brightness = random.uniform(0.7, 1.0)
+                Color(brightness, brightness, brightness, 0.8)
+                Ellipse(pos=(x, y), size=(3, 3))
+            
+            # Add moon
+            Color(0.95, 0.95, 0.8, 1)
+            Ellipse(pos=(400, 700), size=(50, 50))
+            
+            # Add cloud
+            Color(0.9, 0.9, 0.95, 0.3)
+            Ellipse(pos=(100, 200), size=(120, 40))
+            Ellipse(pos=(130, 210), size=(90, 35))
+            Ellipse(pos=(70, 205), size=(80, 30))
+        
+        return overlay
