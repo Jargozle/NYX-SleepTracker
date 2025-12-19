@@ -18,10 +18,15 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import re
 
+from celestial_overlay import add_celestial_background
+
 
 class ForgotPasswordScreen(Screen):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+
+        add_celestial_background(self, star_count=15, cloud_count=2)
+
         self.verification_code = None
         self.user_email = None
         self.step = 1  # 1: Enter email, 2: Enter code, 3: Reset password
@@ -223,8 +228,8 @@ class ForgotPasswordScreen(Screen):
         self.show_pass2_btn = Button(
             size_hint=(None, 1),
             width=50,
-            background_normal='assets/Eyeslash.png',
-            background_down='assets/Eyeslash.png',
+            background_normal='assets/Eyeslash.jpg',
+            background_down='assets/Eyeslash.jpg',
             background_color=(0.6, 0.6, 0.7, 1),  # Light gray/blue color
             border=(0, 0, 0, 0)
         )
@@ -262,20 +267,20 @@ class ForgotPasswordScreen(Screen):
     def toggle_password_visibility(self, instance):
         self.new_pass.password = not self.new_pass.password
         if self.new_pass.password:
-            self.show_pass_btn.background_normal = 'assets/Eyeslash.png'
-            self.show_pass_btn.background_down = 'assets/Eyeslash.png'
+            self.show_pass_btn.background_normal = 'assets/Eyeslash.jpg'
+            self.show_pass_btn.background_down = 'assets/Eyeslash.jpg'
         else:
-            self.show_pass_btn.background_normal = 'assets/Eye.png'
-            self.show_pass_btn.background_down = 'assets/Eye.png'
+            self.show_pass_btn.background_normal = 'assets/Eye.jpg'
+            self.show_pass_btn.background_down = 'assets/Eye.jpg'
     
     def toggle_password2_visibility(self, instance):
         self.new_pass2.password = not self.new_pass2.password
         if self.new_pass2.password:
-            self.show_pass2_btn.background_normal = 'assets/Eyeslash.png'
-            self.show_pass2_btn.background_down = 'assets/Eyeslash.png'
+            self.show_pass2_btn.background_normal = 'assets/Eyeslash.jpg'
+            self.show_pass2_btn.background_down = 'assets/Eyeslash.jpg'
         else:
-            self.show_pass2_btn.background_normal = 'assets/Eye.png'
-            self.show_pass2_btn.background_down = 'assets/Eye.png'
+            self.show_pass2_btn.background_normal = 'assets/Eye.jpg'
+            self.show_pass2_btn.background_down = 'assets/Eye.jpg'
     
     def generate_code(self):
         """Generate a 6-digit verification code"""
@@ -284,8 +289,8 @@ class ForgotPasswordScreen(Screen):
     def send_email(self, to_email, code):
         """Send verification code via email"""
         # IMPORTANT: Configure these with your email settings
-        sender_email = "your-email@gmail.com"  # Replace with your email
-        sender_password = "your-app-password"   # Replace with your app password
+        sender_email = "djcaguioa22@gmail.com"  # Replace with your email
+        sender_password = "tbmi bdzt auar vnkv"   # Replace with your app password
         
         msg = MIMEMultipart()
         msg['From'] = sender_email
@@ -356,13 +361,13 @@ class ForgotPasswordScreen(Screen):
         Clock.schedule_once(lambda dt: self.show_code_step(), 2)
         
         # To actually send email, uncomment:
-        # if self.send_email(email, self.verification_code):
-        #     self.message.text = "Code sent to your email!"
-        #     self.message.color = (0.3, 1, 0.3, 1)
-        #     Clock.schedule_once(lambda dt: self.show_code_step(), 2)
-        # else:
-        #     self.message.text = "Failed to send email. Try again."
-        #     self.message.color = (1, 0.3, 0.3, 1)
+        if self.send_email(email, self.verification_code):
+            self.message.text = "Code sent to your email!"
+            self.message.color = (0.3, 1, 0.3, 1)
+            Clock.schedule_once(lambda dt: self.show_code_step(), 2)
+        else:
+            self.message.text = "Failed to send email. Try again."
+            self.message.color = (1, 0.3, 0.3, 1)
     
     def verify_code(self, instance):
         code = self.code_input.text.strip()
@@ -432,3 +437,4 @@ class ForgotPasswordScreen(Screen):
     def go_back(self, instance):
         self.show_email_step()
         self.manager.current = "login"
+
