@@ -8,6 +8,7 @@ from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.textinput import TextInput
 from kivy.uix.button import Button
 from kivy.uix.label import Label
+from kivy.uix.image import Image
 from kivy.clock import Clock
 import NyxDB as db
 import re
@@ -60,7 +61,7 @@ class RegisterScreen(Screen):
         )
         layout.add_widget(self.reg_email)
         
-        # Password with show/hide
+        # Password with show/hide using image
         pass_container = BoxLayout(orientation='horizontal', size_hint_y=None, height=50, spacing=5)
         self.reg_pass = TextInput(
             hint_text="Password",
@@ -75,17 +76,17 @@ class RegisterScreen(Screen):
         pass_container.add_widget(self.reg_pass)
         
         self.show_pass_btn = Button(
-            text="👁",
             size_hint=(None, 1),
             width=50,
-            font_size=24,
-            background_color=(0.25, 0.25, 0.35, 1)
+            background_normal='assets/Eyeslash.jpg',
+            background_down='assets/Eyeslash.jpg',
+            border=(0, 0, 0, 0)
         )
         self.show_pass_btn.bind(on_press=self.toggle_password_visibility)
         pass_container.add_widget(self.show_pass_btn)
         layout.add_widget(pass_container)
         
-        # Confirm Password with show/hide
+        # Confirm Password with show/hide using image
         pass2_container = BoxLayout(orientation='horizontal', size_hint_y=None, height=50, spacing=5)
         self.reg_pass2 = TextInput(
             hint_text="Confirm Password",
@@ -100,11 +101,11 @@ class RegisterScreen(Screen):
         pass2_container.add_widget(self.reg_pass2)
         
         self.show_pass2_btn = Button(
-            text="👁",
             size_hint=(None, 1),
             width=50,
-            font_size=24,
-            background_color=(0.25, 0.25, 0.35, 1)
+            background_normal='assets/Eyeslash.jpg',
+            background_down='assets/Eyeslash.jpg',
+            border=(0, 0, 0, 0)
         )
         self.show_pass2_btn.bind(on_press=self.toggle_password2_visibility)
         pass2_container.add_widget(self.show_pass2_btn)
@@ -156,11 +157,21 @@ class RegisterScreen(Screen):
     
     def toggle_password_visibility(self, instance):
         self.reg_pass.password = not self.reg_pass.password
-        self.show_pass_btn.text = "👁" if self.reg_pass.password else "👁‍🗨"
+        if self.reg_pass.password:
+            self.show_pass_btn.background_normal = 'assets/Eyeslash.jpg'
+            self.show_pass_btn.background_down = 'assets/Eyeslash.jpg'
+        else:
+            self.show_pass_btn.background_normal = 'assets/Eye.jpg'
+            self.show_pass_btn.background_down = 'assets/Eye.jpg'
     
     def toggle_password2_visibility(self, instance):
         self.reg_pass2.password = not self.reg_pass2.password
-        self.show_pass2_btn.text = "👁" if self.reg_pass2.password else "👁‍🗨"
+        if self.reg_pass2.password:
+            self.show_pass2_btn.background_normal = 'assets/Eyeslash.jpg'
+            self.show_pass2_btn.background_down = 'assets/Eyeslash.jpg'
+        else:
+            self.show_pass2_btn.background_normal = 'assets/Eye.jpg'
+            self.show_pass2_btn.background_down = 'assets/Eye.jpg'
     
     def validate_email(self, email):
         """Validate email format"""
@@ -170,6 +181,7 @@ class RegisterScreen(Screen):
     def validate_password(self, password):
         """
         Validate password requirements:
+        - At least 8 characters
         - At least 1 uppercase letter
         - At least 1 lowercase letter
         - At least 3 numbers
@@ -252,6 +264,4 @@ class RegisterScreen(Screen):
         self.message.color = (1, 0.3, 0.3, 1)
         self.reg_pass.password = True
         self.reg_pass2.password = True
-        self.show_pass_btn.text = "👁"
-        self.show_pass2_btn.text = "👁"
         self.manager.current = "login"
