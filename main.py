@@ -2,7 +2,7 @@
 Nyx Sleep Tracker - Main Application
 Run this file to start the application
 """
-
+from kivy.clock import Clock
 from kivy.app import App
 from kivy.uix.screenmanager import ScreenManager
 from kivy.core.window import Window
@@ -15,8 +15,7 @@ from Screens.stats_screen import StatsScreen
 from Screens.graph_screen import GraphScreen
 
 Window.size = (500, 800)
-Window.clearcolor = (0.05, 0.05, 0.08, 1)
-
+Window.clearcolor = (0.05, 0.05, 0.15, 1)
 
 class NyxApp(App):
     def build(self):
@@ -28,7 +27,6 @@ class NyxApp(App):
         sm.add_widget(StatsScreen(name="stats"))
         sm.add_widget(GraphScreen(name="graphs"))
         return sm
-
 
 if __name__ == "__main__":
     NyxApp().run()
