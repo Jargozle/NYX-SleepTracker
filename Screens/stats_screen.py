@@ -2,6 +2,7 @@
 Statistics Screen for Nyx Sleep Tracker
 """
 
+import random
 from kivy.uix.screenmanager import Screen
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
@@ -10,6 +11,7 @@ from kivy.uix.scrollview import ScrollView
 from kivy.uix.gridlayout import GridLayout
 from kivy.graphics import Color, RoundedRectangle, Rectangle
 from datetime import datetime
+from celestial_overlay import add_celestial_background
 from components import create_stat_card
 import NyxDB as db
 
@@ -19,6 +21,8 @@ class StatsScreen(Screen):
         super().__init__(**kwargs)
         self.user = None
 
+        add_celestial_background(self, star_count=15, cloud_count=2)
+        
         root = BoxLayout(orientation='vertical', padding=0, spacing=0)
         self.add_widget(root)
 
@@ -63,7 +67,7 @@ class StatsScreen(Screen):
 
         # Graph button
         graph_btn = Button(
-            text="View Sleep Graphs",
+            text="View Sleep Charts",
             size_hint=(1, None),
             height=60,
             font_size=20,
